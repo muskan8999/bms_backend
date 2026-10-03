@@ -53,7 +53,7 @@ const getAllMaterials = async(req, res)=>{
     try{
         const {page, limit, search} = req.query
         const limitNumber = Number(limit) || 10;
-    const pageNumber = Number(page) || 1;
+        const pageNumber = Number(page) || 1;
     if (
       !Number.isInteger(pageNumber) ||
       !Number.isInteger(limitNumber) ||
