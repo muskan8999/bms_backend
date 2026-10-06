@@ -1,41 +1,55 @@
 const rentalService = require("../services/rental.service");
-const createRental = async(req, res)=>{
-    try{
+const createRental = async (req, res) => {
+    try {
 
-        const {customerId, materialId, quantity, startDate, endDate, notes} = req.body;
+        const { customerId, startDate, endDate, notes, items } = req.body;
 
-        if(!customerId || !materialId || !quantity || !startDate){
+        if (!customerId || !startDate) {
             return res.status(400).json({
                 success: false,
-                message: "customerId, materialId, quantity, startDate  are required"
+                message: "customerId, startDate  are required"
             })
         }
 
-        
-    if (!Number.isInteger(Number(quantity)) || Number(quantity) <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Quantity must be a positive integer",
-      });
-    }
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "At least one material is required"
+            });
+        }
 
-    const rental = await rentalService.createRental({
-        customerId,
-        materialId,
-        quantity,
-        startDate,
-        endDate :endDate || null,
-        notes
-    })
+        for (const item of items) {
+            if (!item.materialId || item.quantity === undefined) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Each item must have materialId and quantity"
+                });
+            }
+            if (!Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Quantity must be a positive integer"
+                });
+            }
+        }
 
 
-    return res.status(200).json({
-        success: true,
-        message: "Rental created successfully",
-        rental
-    })
+        const rental = await rentalService.createRental({
+            customerId,
+            startDate,
+            endDate: endDate || null,
+            notes,
+            items
+        })
 
-    }catch(error){
+
+        return res.status(200).json({
+            success: true,
+            message: "Rental created successfully",
+            rental
+        })
+
+    } catch (error) {
         console.log("create rental error", error)
         return res.status(500).json({
             success: false,
@@ -44,9 +58,9 @@ const createRental = async(req, res)=>{
     }
 }
 
-const getAllRentals = async(req,res)=>{
-    try{
-        const{page,limit, search, status} = req.query
+const getAllRentals = async (req, res) => {
+    try {
+        const { page, limit, search, status } = req.query
         const limitNumber = Number(limit) || 10;
         const pageNumber = Number(page) || 1;
         const rentalData = await rentalService.getAllRentals(
@@ -59,16 +73,44 @@ const getAllRentals = async(req,res)=>{
             rentalData
         })
 
-    }catch(error){
+    } catch (error) {
         console.log("get rental error", error)
         return res.status(500).json({
-            success:false,
+            success: false,
             message: "Internal server error"
         })
 
     }
 }
+
+const getRentalById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const rental = await rentalService.getRentalById(id)
+        if (!rental) {
+            return res.status(400).json({
+                success: false,
+                message: "Rental id is required"
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Rental fetched successfully",
+            rental
+        });
+
+    } catch (error) {
+        console.log("get rental by id error", error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+
+    }
+}
 module.exports = {
     createRental,
-    getAllRentals
+    getAllRentals,
+    getRentalById
 }

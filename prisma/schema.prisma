@@ -28,7 +28,7 @@ model Material {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  rentals Rental[]
+ rentalItems RentalItem[]
 }
 
 enum RentalStatus {
@@ -38,21 +38,33 @@ enum RentalStatus {
 }
 
 model Rental {
-  id              String       @id @default(cuid())
-  customerId      String
+  id          String       @id @default(cuid())
+  customerId  String
+  startDate   DateTime
+  endDate     DateTime?
+  totalAmount Decimal?     @db.Decimal(10, 2)
+  status      RentalStatus @default(ACTIVE)
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  customer Customer     @relation(fields: [customerId], references: [id])
+  items    RentalItem[]
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model RentalItem {
+  id              String   @id @default(cuid())
+  rentalId        String
   materialId      String
   quantity        Int
-  startDate       DateTime
-  endDate         DateTime?
-  dailyRentalRate Decimal      @db.Decimal(10, 2)
-  totalAmount     Decimal?      @db.Decimal(10, 2)
-  status          RentalStatus @default(ACTIVE)
-  notes           String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  customer        Customer     @relation(fields: [customerId], references: [id])
-  material        Material     @relation(fields: [materialId], references: [id])
-  @@index([customerId])
+  dailyRentalRate Decimal  @db.Decimal(10, 2)
+
+  rental   Rental   @relation(fields: [rentalId], references: [id])
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@index([rentalId])
   @@index([materialId])
-  @@index([status])
 }
