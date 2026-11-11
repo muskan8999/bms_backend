@@ -109,8 +109,104 @@ const getRentalById = async (req, res) => {
 
     }
 }
+
+
+const returnRental = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const {
+            returnDate,
+            items,
+            damageCharges,
+            additionalCharges,
+            discount,
+            notes
+        } = req.body;
+
+        if (!returnDate) {
+            return res.status(400).json({
+                success: false,
+                message: "Return date is required"
+            });
+        }
+
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "At least one return item is required"
+            });
+        }
+
+        for (const item of items) {
+            if (!item.materialId || item.quantity === undefined) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Each item must have materialId and quantity"
+                });
+            }
+
+            if (
+                !Number.isInteger(Number(item.quantity)) ||
+                Number(item.quantity) <= 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Return quantity must be a positive integer"
+                });
+            }
+        }
+
+        const result = await rentalService.returnRental(id, {
+            returnDate,
+            items,
+            damageCharges,
+            additionalCharges,
+            discount,
+            notes
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: result.fullyReturned
+                ? "Rental returned successfully. Final bill generated."
+                : "Partial return recorded successfully.",
+            ...result
+        });
+
+    } catch (error) {
+        console.log("return rental error:", error);
+
+        const clientErrors = [
+            "Rental not found",
+            "Rental is not active",
+            "Invalid return date",
+            "Return date cannot be before rental start date",
+            "Return date cannot be before previous return date",
+            "At least one return item is required",
+            "Return quantity must be a positive integer",
+            "Material does not belong to this rental",
+            "Duplicate material in return request",
+            "Charges and discount must be valid non-negative numbers",
+            "Discount cannot be greater than the final bill"
+        ];
+
+        const isClientError =
+            clientErrors.includes(error.message) ||
+            error.message.startsWith("Only ");
+
+        return res.status(isClientError ? 400 : 500).json({
+            success: false,
+            message: isClientError
+                ? error.message
+                : "Internal server error"
+        });
+    }
+};
+
 module.exports = {
     createRental,
     getAllRentals,
-    getRentalById
+    getRentalById,
+    returnRental
 }
