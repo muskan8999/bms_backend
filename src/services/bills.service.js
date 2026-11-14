@@ -1,28 +1,35 @@
 const prisma = require("../config/prisma");
 
-const prisma = require("../config/prisma");
 
-const getAllBills = async ({ page = 1, limit = 10, search = "" }) => {
+const getAllBills = async ({
+  page = 1,
+  limit = 10,
+  search = "",
+  status = "all",
+}) => {
   const currentPage = Math.max(1, Number(page) || 1);
   const pageSize = Math.max(1, Number(limit) || 10);
   const skip = (currentPage - 1) * pageSize;
 
-  // 1. Only fetch completed rentals
+  const searchTerm = search.trim();
+  const paymentStatus = status.toUpperCase();
+
+  // 1. Search completed rentals.
   const where = {
     status: "COMPLETED",
 
-    ...(search.trim() && {
+    ...(searchTerm && {
       OR: [
         {
           id: {
-            contains: search.trim(),
+            contains: searchTerm,
             mode: "insensitive",
           },
         },
         {
           customer: {
             name: {
-              contains: search.trim(),
+              contains: searchTerm,
               mode: "insensitive",
             },
           },
@@ -30,7 +37,7 @@ const getAllBills = async ({ page = 1, limit = 10, search = "" }) => {
         {
           customer: {
             phone: {
-              contains: search.trim(),
+              contains: searchTerm,
             },
           },
         },
@@ -38,43 +45,37 @@ const getAllBills = async ({ page = 1, limit = 10, search = "" }) => {
     }),
   };
 
-  // 2. Fetch bills and total count
-  const [rentals, totalBills] = await Promise.all([
-    prisma.rental.findMany({
-      where,
-      skip,
-      take: pageSize,
-      orderBy: {
-        endDate: "desc",
-      },
-      include: {
-        customer: true,
-        items: {
-          include: {
-            material: true,
-          },
+  // 2. Fetch all matching rentals with payment information.
+  const rentals = await prisma.rental.findMany({
+    where,
+    orderBy: {
+      endDate: "desc",
+    },
+    include: {
+      customer: true,
+      items: {
+        include: {
+          material: true,
         },
-        payments: true,
       },
-    }),
+      payments: true,
+    },
+  });
 
-    prisma.rental.count({ where }),
-  ]);
-
-  // 3. Transform rentals into bill data
-  const bills = rentals.map((rental) => {
+  // 3. Calculate bill and payment status.
+  const allBills = rentals.map((rental) => {
     const totalAmount = Number(rental.totalAmount || 0);
 
     const paidAmount = rental.payments.reduce(
       (sum, payment) => sum + Number(payment.amount),
-      0,
+      0
     );
 
     const balance = Math.max(0, totalAmount - paidAmount);
 
     let paymentStatus = "PENDING";
 
-    if (paidAmount >= totalAmount) {
+    if (balance <= 0) {
       paymentStatus = "PAID";
     } else if (paidAmount > 0) {
       paymentStatus = "PARTIAL";
@@ -86,38 +87,49 @@ const getAllBills = async ({ page = 1, limit = 10, search = "" }) => {
     const startDay = Date.UTC(
       startDate.getUTCFullYear(),
       startDate.getUTCMonth(),
-      startDate.getUTCDate(),
+      startDate.getUTCDate()
     );
 
     const endDay = Date.UTC(
       endDate.getUTCFullYear(),
       endDate.getUTCMonth(),
-      endDate.getUTCDate(),
+      endDate.getUTCDate()
     );
 
-    const totalDays = Math.max(1, Math.ceil((endDay - startDay) / 86400000));
+    const totalDays = Math.max(
+      1,
+      Math.ceil((endDay - startDay) / 86400000)
+    );
 
     return {
       id: rental.id,
       rentalId: rental.id,
-
       customer: rental.customer,
-
       issueDate: rental.startDate,
       returnDate: rental.endDate,
       totalDays,
-
       items: rental.items,
-
       totalAmount,
       paidAmount,
       balance,
-
       status: paymentStatus,
     };
   });
 
-  // 4. Pagination information
+  // 4. Filter by payment status.
+  const filteredBills =
+    paymentStatus === "ALL"
+      ? allBills
+      : allBills.filter((bill) => bill.status === paymentStatus);
+
+  // 5. Apply pagination after filtering.
+  const totalBills = filteredBills.length;
+
+  const bills = filteredBills.slice(
+    skip,
+    skip + pageSize
+  );
+
   const totalPages = Math.ceil(totalBills / pageSize);
 
   return {
@@ -128,6 +140,7 @@ const getAllBills = async ({ page = 1, limit = 10, search = "" }) => {
     pageSize,
   };
 };
+
 
 const getBillById = async (rentalId) => {
   // 1. Find completed rental

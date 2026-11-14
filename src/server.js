@@ -6,6 +6,7 @@ require("dotenv").config()
 const customerRoutes = require("./routes/customer.route")
 const materialRoutes = require("./routes/material.route")
 const rentalRoutes = require("./routes/rental.route")
+const billsRoutes = require("./routes/bills.route")
 
 const app = express();
 
@@ -19,6 +20,8 @@ app.use(express.json())
 app.use("/api/customers", customerRoutes)
 app.use("/api/materials", materialRoutes)
 app.use("/api/rentals", rentalRoutes)
+app.use("/api/bills", billsRoutes)
+
 
 app.get("/", (req,res)=>{
     res.json({
